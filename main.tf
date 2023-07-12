@@ -34,10 +34,26 @@ resource "aws_s3_bucket_acl" "bucket_acl" {
   acl    = "private"
 }
 
+resource "null_resource" "lambda_dependencies" {
+  provisioner "local-exec" {
+    command = "cd ${path.module}/tg-bot-timezone && npm install"
+  }
+
+  triggers = {
+    package = sha256(file("${path.module}/tg-bot-timezone/package.json"))
+    lock = sha256(file("${path.module}/tg-bot-timezone/package-lock.json"))
+  }
+}
+
+locals {
+  lambda_dependency_id = "${null_resource.lambda_dependencies.id}"
+  source_dir           = "${path.module}/tg-bot-timezone"
+}
+
 data "archive_file" "lambda_tg_bot" {
   type = "zip"
 
-  source_dir  = "${path.module}/tg-bot-timezone"
+  source_dir  = "${local.source_dir}"
   output_path = "${path.module}/tg-bot-timezone.zip"
 }
 
@@ -62,6 +78,12 @@ resource "aws_lambda_function" "tg_bot" {
   source_code_hash = data.archive_file.lambda_tg_bot.output_base64sha256
 
   role = aws_iam_role.lambda_exec.arn
+
+  environment {
+    variables = {
+      tg_bot_token = var.tg_bot_token
+    }
+  }
 }
 
 resource "aws_cloudwatch_log_group" "tg_bot" {

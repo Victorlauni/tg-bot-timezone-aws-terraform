@@ -34,3 +34,7 @@ override.tf.json
 terraform.rc
 tg-bot-timezone.zip
 response.json
+
+variables-secret.tf
+
+tg-bot-timezone/node_modules/
