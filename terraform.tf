@@ -3,16 +3,16 @@
 
 terraform {
 
-  cloud {
-    workspaces {
-      name = "learn-terraform-lambda-api-gateway"
-    }
-  }
+  # cloud {
+  #   workspaces {
+  #     name = "learn-terraform-lambda-api-gateway"
+  #   }
+  # }
 
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 4.15.0"
+      version = "~> 5.7.0"
     }
     random = {
       source  = "hashicorp/random"
