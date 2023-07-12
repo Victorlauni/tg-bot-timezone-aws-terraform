@@ -1,15 +1,7 @@
-/**
- * Copyright (c) HashiCorp, Inc.
- * SPDX-License-Identifier: MPL-2.0
- */
 
-// Lambda function code
 const TelegramBot = require('node-telegram-bot-api');
-
-// replace the value below with the Telegram token you receive from @BotFather
+const moment = require('moment-timezone');
 const token = process.env.tg_bot_token;
-
-// Create a bot that uses 'polling' to fetch new updates
 const bot = new TelegramBot(token);
 
 module.exports.handler = async (event, context, callback) => {
@@ -17,17 +9,18 @@ module.exports.handler = async (event, context, callback) => {
   const bodyJson = JSON.parse(body);
   console.debug('Event: ', event);
   if (bodyJson.message) {
-    // Retrieve the ID for this chat
-    // and the text that the user sent
     const { chat: { id }, text } = bodyJson.message;
-    
-    // Create a message to send back
-    // We can use Markdown inside this
-    const message = `✅ Thanks for your message: *"${text}"*\nHave a great day! 👋🏻`;
-
-    // Send our new message back in Markdown and
-    // wait for the request to finish
-    await bot.sendMessage(id, message, {parse_mode: 'Markdown'});
+    const command = text;
+    switch (command) {
+      case '/start': 
+        await startHandler(id);
+        break;
+      case '/now':
+        await getCurrentTimeHandler(id);
+        break;
+      default:
+        break;
+    }
   }
 
   return {
@@ -39,4 +32,18 @@ module.exports.handler = async (event, context, callback) => {
       message: "OK",
     }),
   }
+}
+
+const startHandler = async (id) => {
+
+  const message = `✅ Thanks for your message\nHave a great day! 👋🏻`;
+
+  // Send our new message back in Markdown and
+  // wait for the request to finish
+  await bot.sendMessage(id, message, {parse_mode: 'Markdown'});
+}
+
+const getCurrentTimeHandler = async (id) => {
+  const now = moment();
+  await bot.sendMessage(id, now.tz("Asia/Tokyo").format("MMM DD, HH:mm z"));
 }
