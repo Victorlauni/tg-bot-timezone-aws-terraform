@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.369.0",
     "moment": "^2.29.4",
     "moment-timezone": "^0.5.43",
     "node-telegram-bot-api": "^0.61.0"
