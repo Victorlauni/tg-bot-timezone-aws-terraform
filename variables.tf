@@ -9,3 +9,10 @@ variable "aws_region" {
   type    = string
   default = "us-east-1"
 }
+
+variable "dynamodb_arn" {
+  description = "arn for dynamodb"
+
+  type    = string
+  default = "arn:aws:dynamodb:us-east-1:823276892724:table/tg_timezone"
+}

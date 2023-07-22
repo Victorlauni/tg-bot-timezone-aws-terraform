@@ -3,6 +3,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const moment = require('moment-timezone');
 const token = process.env.tg_bot_token;
 const bot = new TelegramBot(token);
+const { DynamoDBClient, ScanCommand } = require("@aws-sdk/client-dynamodb");
+const dbClient = new DynamoDBClient();
 
 module.exports.handler = async (event, context, callback) => {
   const { body } = event;
@@ -17,6 +19,9 @@ module.exports.handler = async (event, context, callback) => {
         break;
       case '/now':
         await getCurrentTimeHandler(id);
+        break;
+      case '/db_connection':
+        await testDbConnection(id);
         break;
       default:
         break;
@@ -46,4 +51,19 @@ const startHandler = async (id) => {
 const getCurrentTimeHandler = async (id) => {
   const now = moment();
   await bot.sendMessage(id, now.tz("Asia/Tokyo").format("MMM DD, HH:mm z"));
+}
+
+const testDbConnection = async (id) => {
+  const params = {
+    TableName: "tg_timezone"
+  }
+  const command = new ScanCommand(params);
+  try {
+    const data = await dbClient.send(command);
+    console.log(data);
+    await bot.sendMessage(id, "db is connected.")
+  } catch (err) {
+    console.error(err);
+    await bot.sendMessage(id, "Error connecting to db.")
+  }
 }
