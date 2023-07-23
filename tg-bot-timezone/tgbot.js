@@ -11,17 +11,21 @@ module.exports.handler = async (event, context, callback) => {
   const bodyJson = JSON.parse(body);
   console.debug('Event: ', event);
   if (bodyJson.message) {
-    const { chat: { id }, text } = bodyJson.message;
+    const { chat: { id : chatId }, text, from : { id : userId}, entities : taggedUsers } = bodyJson.message;
     const command = text;
     switch (command) {
-      case '/start': 
-        await startHandler(id);
+      case '/start': case '/help': 
+        await startHandler(chatId);
         break;
       case '/now':
-        await getCurrentTimeHandler(id);
+        await getCurrentTimeHandler(chatId);
+        break;
+      case '/setTimezone':
+        break;
+      case '/getTimezones':
         break;
       case '/db_connection':
-        await testDbConnection(id);
+        await testDbConnection(chatId);
         break;
       default:
         break;
