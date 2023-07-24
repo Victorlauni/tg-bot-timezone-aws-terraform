@@ -86,31 +86,7 @@ resource "aws_iam_role" "lambda_exec" {
   })
 }
 
-resource "aws_iam_policy" "dynamoDBLambdaPolicy" {
-  name = "DynamoDBLambdaPolicy"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:Scan"
-        ]
-        Resource = [
-          var.dynamodb_arn
-        ]
-      }
-    ]
-  })
-}
-
 resource "aws_iam_role_policy_attachment" "lambda_policy" {
-  for_each = toset([
-    aws_iam_policy.dynamoDBLambdaPolicy.arn,
-    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-  ])
   role       = aws_iam_role.lambda_exec.name
-  policy_arn = each.value
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
