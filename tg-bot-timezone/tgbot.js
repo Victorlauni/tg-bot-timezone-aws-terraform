@@ -15,15 +15,16 @@ const throwIfError = (error) => {
   }
 }
 
-const getTaggedUserId = (taggedUsers) => {
-  return taggedUsers.length > 0 ? taggedUsers[0].type == "mention" ? taggedUsers[0].user.id : null : null;
+const getTaggedUser = (taggedUsers) => {
+  return taggedUsers.length > 0 ? taggedUsers[0].type == "mention" ? taggedUsers[0].user : null : null;
 }
 
-const constructDbObject = (userId, chatId, timezone) => {
+const constructDbObject = (userId, chatId, timezone, username) => {
   return {
     userId: userId,
     chatId: chatId,
-    timezone: timezone
+    timezone: timezone,
+    username: username
   }
 }
 
@@ -32,7 +33,7 @@ module.exports.handler = async (event, context, callback) => {
   const bodyJson = JSON.parse(body);
   console.debug('Event: ', event);
   if (bodyJson.message) {
-    const { chat: { id : chatId }, text, from : { id : userId}, entities : taggedUsers } = bodyJson.message;
+    const { chat: { id : chatId }, text, from : { id : userId, username }, entities : taggedUsers } = bodyJson.message;
     const textSplit = text.split(" ");
     const command = textSplit[0];
     try {
@@ -47,7 +48,11 @@ module.exports.handler = async (event, context, callback) => {
           await getCurrentTimeHandler(chatId);
           break;
         case '/setTimezone':
-          await setTimezoneHandler(chatId, textSplit[textSplit.length-1], getTaggedUserId(taggedUsers) ?? userId);
+          await setTimezoneHandler(
+            chatId, 
+            textSplit[textSplit.length-1], 
+            getTaggedUser(taggedUsers)?.id ?? userId,
+            getTaggedUser(taggedUsers)?.username ?? username);
           break;
         case '/getTimezones':
           await getTimezoneHandler(chatId);
@@ -89,14 +94,30 @@ const getCurrentTimeHandler = async (id) => {
   await bot.sendMessage(id, now.tz("Asia/Tokyo").format("MMM DD, HH:mm z"));
 }
 
-const setTimezoneHandler = async (chatId, timezone, userId) => {
-  const { data, error } = await supabase.from(TABLE_NAME).upsert(constructDbObject(userId, chatId, timezone));
+const setTimezoneHandler = async (chatId, timezone, userId, username) => {
+  const { data, error } = await supabase.from(TABLE_NAME).upsert(constructDbObject(userId, chatId, timezone, username));
   throwIfError(error);
   await bot.sendMessage(chatId, "OK");
 }
 
 const getTimezoneHandler = async (chatId) => {
-  
+  const { data, error } = await supabase.from(TABLE_NAME)
+    .select("*")
+    .eq("chatId", chatId);
+  throwIfError(error);
+  const map = new Map();
+  data.map(record => {
+    if (map.has(record.timezone)) map.get(record.timezone).push({userId: record.userId, username: record.username});
+    else {
+      map.set(record.timezone, [{userId: record.userId, username: record.username}]);
+    }
+  })
+  let message = "";
+  for (let timezone of map.keys()) {
+    const taggedUsers = map.get(timezone).map(userInfo => "[@" + userInfo.username + "](" + TAG_USER_TEXT + userInfo.userId + ")").join(" ");
+    message += timezone + ": " + taggedUsers + "\n"
+  }
+  await bot.sendMessage(chatId, message, {parse_mode: "MarkdownV2"});
 }
 
 const testDbConnection = async (chatId) => {
