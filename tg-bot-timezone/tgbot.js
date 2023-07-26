@@ -4,10 +4,27 @@ const moment = require('moment-timezone');
 const crypto = require('crypto');
 const token = process.env.tg_bot_token;
 const bot = new TelegramBot(token);
+const { createClient } =  require('@supabase/supabase-js')
+const supabase = createClient(process.env.supabase_url, process.env.supabase_key)
 const TAG_USER_TEXT = "tg://user?id=";
+const TABLE_NAME = "timezoneRecord";
+
+const throwIfError = (error) => {
+  if (error) {
+    throw error;
+  }
+}
 
 const getTaggedUserId = (taggedUsers) => {
   return taggedUsers.length > 0 ? taggedUsers[0].type == "mention" ? taggedUsers[0].user.id : null : null;
+}
+
+const constructDbObject = (userId, chatId, timezone) => {
+  return {
+    userId: userId,
+    chatId: chatId,
+    timezone: timezone
+  }
 }
 
 module.exports.handler = async (event, context, callback) => {
@@ -73,6 +90,8 @@ const getCurrentTimeHandler = async (id) => {
 }
 
 const setTimezoneHandler = async (chatId, timezone, userId) => {
+  const { data, error } = await supabase.from(TABLE_NAME).upsert(constructDbObject(userId, chatId, timezone));
+  throwIfError(error);
   await bot.sendMessage(chatId, "OK");
 }
 
@@ -80,8 +99,12 @@ const getTimezoneHandler = async (chatId) => {
   
 }
 
-const testDbConnection = async (id) => {
-  
+const testDbConnection = async (chatId) => {
+  const { count, error } = await supabase
+    .from("timezoneRecord")
+    .select("*", { count: 'exact', head: true });
+  throwIfError(error);
+  await bot.sendMessage(chatId, "Database is connected.")
 }
 
 const resetHandler = async (chatId) => {

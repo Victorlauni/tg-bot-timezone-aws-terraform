@@ -53,7 +53,9 @@ resource "aws_lambda_function" "tg_bot" {
 
   environment {
     variables = {
-      tg_bot_token = var.tg_bot_token
+      tg_bot_token = var.tg_bot_token,
+      supabase_url = var.supabase_url,
+      supabase_key = var.supabase_key
     }
   }
 }
