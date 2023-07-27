@@ -1,10 +1,9 @@
 
 const TelegramBot = require('node-telegram-bot-api');
 const moment = require('moment-timezone');
-const crypto = require('crypto');
 const token = process.env.tg_bot_token;
 const bot = new TelegramBot(token);
-const { createClient } =  require('@supabase/supabase-js')
+const { createClient } =  require('@supabase/supabase-js');
 const supabase = createClient(process.env.supabase_url, process.env.supabase_key)
 const TAG_USER_TEXT = "tg://user?id=";
 const TABLE_NAME = "timezoneRecord";
@@ -15,8 +14,13 @@ const throwIfError = (error) => {
   }
 }
 
-const getTaggedUser = (taggedUsers) => {
-  return taggedUsers.length > 0 ? taggedUsers[0].type == "mention" ? taggedUsers[0].user : null : null;
+const getTaggedUser = (username, taggedUsers) => {
+  console.log(taggedUsers.toString());
+  for (let i of taggedUsers) {
+    if (i.type == "text_mention") return {userId: i.user.id, username: username}
+    if (i.type == "mention") return {username: username}
+  }
+  return null;
 }
 
 const constructDbObject = (userId, chatId, timezone, username) => {
@@ -36,6 +40,7 @@ module.exports.handler = async (event, context, callback) => {
     const { chat: { id : chatId }, text, from : { id : userId, username }, entities : taggedUsers } = bodyJson.message;
     const textSplit = text.split(" ");
     const command = textSplit[0];
+    const taggedUser = textSplit.length > 1 ? getTaggedUser(textSplit[1].replace("@", ""), taggedUsers): null;
     try {
       switch (command) {
         case '/start': case '/help': 
@@ -45,16 +50,19 @@ module.exports.handler = async (event, context, callback) => {
           await resetHandler(chatId);
           break;
         case '/now':
-          await getCurrentTimeHandler(chatId);
+          await getCurrentTimeHandler(chatId, userId, username);
           break;
-        case '/setTimezone':
+        case '/gettime':
+          await getTimeHandler(chatId, userId, username, textSplit[textSplit.length-1]);
+          break;
+        case '/settimezone':
           await setTimezoneHandler(
             chatId, 
             textSplit[textSplit.length-1], 
-            getTaggedUser(taggedUsers)?.id ?? userId,
-            getTaggedUser(taggedUsers)?.username ?? username);
+            taggedUser? taggedUser.userId??taggedUser.username : userId,
+            taggedUser? taggedUser.username : username);
           break;
-        case '/getTimezones':
+        case '/gettimezones':
           await getTimezoneHandler(chatId);
           break;
         case '/db_connection':
@@ -89,18 +97,28 @@ const startHandler = async (id) => {
   await bot.sendMessage(id, message, {parse_mode: 'Markdown'});
 }
 
-const getCurrentTimeHandler = async (id) => {
+const getCurrentTimeHandler = async (chatId, userId, username) => {
   const now = moment();
-  await bot.sendMessage(id, now.tz("Asia/Tokyo").format("MMM DD, HH:mm z"));
+  const { data, error } = await supabase.from(TABLE_NAME)
+    .select("*")
+    .eq("chatId", chatId)
+    .or("userId.eq."+userId+",username.eq."+username)
+  throwIfError(error);
+  let timeString = now.utc().tz(data[0].timezone).format("HH:mm");
+  await getTimeHandler(chatId, userId, username, timeString, data[0])
 }
 
 const setTimezoneHandler = async (chatId, timezone, userId, username) => {
+  if (moment.tz.zone(timezone) == null) {
+    await bot.sendMessage(chatId, "timezone not valid.");
+    return;
+  }
   const { data, error } = await supabase.from(TABLE_NAME).upsert(constructDbObject(userId, chatId, timezone, username));
   throwIfError(error);
   await bot.sendMessage(chatId, "OK");
 }
 
-const getTimezoneHandler = async (chatId) => {
+const getTimezoneHandler = async (chatId, sendToBot = true) => {
   const { data, error } = await supabase.from(TABLE_NAME)
     .select("*")
     .eq("chatId", chatId);
@@ -113,11 +131,15 @@ const getTimezoneHandler = async (chatId) => {
     }
   })
   let message = "";
+  let usersGroupedByTimezone = new Map();
   for (let timezone of map.keys()) {
-    const taggedUsers = map.get(timezone).map(userInfo => "[@" + userInfo.username + "](" + TAG_USER_TEXT + userInfo.userId + ")").join(" ");
-    message += timezone + ": " + taggedUsers + "\n"
+    const taggedUsers = map.get(timezone).map(userInfo => userInfo.username != userInfo.userId? "[@" + userInfo.username + "](" + TAG_USER_TEXT + userInfo.userId + ")": "@" + userInfo.username).join(" ");
+    message += timezone.replaceAll("_", "\\_") + ": " + taggedUsers + "\n"
+    usersGroupedByTimezone.set(timezone, taggedUsers);
   }
-  await bot.sendMessage(chatId, message, {parse_mode: "MarkdownV2"});
+
+  if (sendToBot) await bot.sendMessage(chatId, message, {parse_mode: "MarkdownV2"});
+  return usersGroupedByTimezone;
 }
 
 const testDbConnection = async (chatId) => {
@@ -130,4 +152,24 @@ const testDbConnection = async (chatId) => {
 
 const resetHandler = async (chatId) => {
   
+}
+
+const getTimeHandler = async (chatId, userId, username, time, userData) => {
+  if (userData == null) {
+    const { data: userTimezone, error } = await supabase.from(TABLE_NAME)
+      .select("*")
+      .eq("chatId", chatId)
+      .or("userId.eq."+userId+",username.eq."+username);
+    throwIfError(error);
+    userData = userTimezone[0];
+  }
+  let usersGroupedByTimezone = await getTimezoneHandler(chatId, false);
+  let baseTime = moment.tz(time, "HH:mm", userData.timezone).date(15);
+  let message = "";
+  usersGroupedByTimezone.forEach((taggedUsers, timezone, _) => {
+    let theirTime = baseTime.tz(timezone);//.format("HH:mm z")
+    let dayOffset = theirTime.date() - 15;
+    message += theirTime.format("hh:mm A ") + (dayOffset>=0?"\\(\\+":"\\(") + dayOffset + " day\\)" + ": " + taggedUsers + "\n";
+  })
+  await bot.sendMessage(chatId, message, {parse_mode: "MarkdownV2"})
 }
