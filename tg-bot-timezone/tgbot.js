@@ -55,6 +55,13 @@ module.exports.handler = async (event, context, callback) => {
         case '/gettime':
           await getTimeHandler(chatId, userId, username, textSplit[textSplit.length-1]);
           break;
+        case '/gettimeof':
+          await getTimeHandler(
+            chatId,
+            taggedUser? taggedUser.userId??taggedUser.username : userId,
+            taggedUser? taggedUser.username : username,
+            textSplit[textSplit.length-1]
+          )
         case '/settimezone':
           await setTimezoneHandler(
             chatId, 
