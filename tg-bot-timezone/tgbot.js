@@ -176,7 +176,7 @@ const getTimeHandler = async (chatId, userId, username, time, userData) => {
   usersGroupedByTimezone.forEach((taggedUsers, timezone, _) => {
     let theirTime = baseTime.tz(timezone);//.format("HH:mm z")
     let dayOffset = theirTime.date() - 15;
-    message += theirTime.format("hh:mm A ") + (dayOffset>=0?"\\(\\+":"\\(") + dayOffset + " day\\)" + ": " + taggedUsers + "\n";
+    message += theirTime.format("hh:mm A ") + (dayOffset>=0?"\\(\\+":"\\(\\-") + Math.abs(dayOffset) + " day\\)" + ": " + taggedUsers + "\n";
   })
   await bot.sendMessage(chatId, message, {parse_mode: "MarkdownV2"})
 }
