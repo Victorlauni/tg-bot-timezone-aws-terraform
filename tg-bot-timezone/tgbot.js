@@ -39,7 +39,7 @@ module.exports.handler = async (event, context, callback) => {
   if (bodyJson.message) {
     const { chat: { id : chatId }, text, from : { id : userId, username }, entities : taggedUsers } = bodyJson.message;
     const textSplit = text.split(" ");
-    const command = textSplit[0];
+    const command = textSplit[0].split("@")[0];
     const taggedUser = textSplit.length > 1 ? getTaggedUser(textSplit[1].replace("@", ""), taggedUsers): null;
     try {
       switch (command) {
